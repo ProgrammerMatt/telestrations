@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Telestrations</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen active">
+      <h1>Telestrations</h1>
+      <p class="subtitle">Draw, Guess, Laugh!</p>
+
+      <div class="home-buttons">
+        <button id="create-game-btn" class="btn btn-primary">Create Game</button>
+        <button id="join-game-btn" class="btn btn-secondary">Join Game</button>
+      </div>
+    </div>
+
+    <!-- Create Game Screen -->
+    <div id="create-screen" class="screen">
+      <h2>Create Game</h2>
+      <div class="form-group">
+        <label for="host-name">Your Name</label>
+        <input type="text" id="host-name" maxlength="20" placeholder="Enter your name" autocomplete="off">
+      </div>
+      <div class="button-group">
+        <button id="back-from-create" class="btn btn-secondary">Back</button>
+        <button id="create-room-btn" class="btn btn-primary">Create Room</button>
+      </div>
+    </div>
+
+    <!-- Join Game Screen -->
+    <div id="join-screen" class="screen">
+      <h2>Join Game</h2>
+      <div class="form-group">
+        <label for="room-code">Room Code</label>
+        <input type="text" id="room-code" maxlength="4" placeholder="XXXX" autocomplete="off" style="text-transform: uppercase;">
+      </div>
+      <div class="form-group">
+        <label for="player-name">Your Name</label>
+        <input type="text" id="player-name" maxlength="20" placeholder="Enter your name" autocomplete="off">
+      </div>
+      <div class="button-group">
+        <button id="back-from-join" class="btn btn-secondary">Back</button>
+        <button id="join-room-btn" class="btn btn-primary">Join Room</button>
+      </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen">
+      <h2>Lobby</h2>
+      <div class="room-code-display">
+        Room Code: <span id="display-room-code">----</span>
+      </div>
+      <div class="players-section">
+        <h3>Players (<span id="player-count">0</span>/8)</h3>
+        <ul id="player-list"></ul>
+      </div>
+      <div id="host-controls" class="host-controls hidden">
+        <p class="waiting-text">Waiting for players... (minimum 3)</p>
+        <button id="start-game-btn" class="btn btn-primary" disabled>Start Game</button>
+      </div>
+      <div id="guest-controls" class="guest-controls hidden">
+        <p class="waiting-text">Waiting for host to start the game...</p>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+      <div class="game-header">
+        <div class="round-info">
+          Round <span id="current-round">1</span>/<span id="total-rounds">4</span>
+        </div>
+        <div class="timer-display">
+          <span id="timer">60</span>s
+        </div>
+        <div class="submission-info">
+          <span id="submitted-count">0</span>/<span id="total-players">4</span> submitted
+        </div>
+      </div>
+
+      <!-- Draw Phase -->
+      <div id="draw-phase" class="game-phase hidden">
+        <div class="prompt-display">
+          <p>Draw this word:</p>
+          <h3 id="word-to-draw">elephant</h3>
+        </div>
+        <div class="canvas-container">
+          <canvas id="drawing-canvas"></canvas>
+        </div>
+        <div class="canvas-tools">
+          <div class="color-picker">
+            <button class="color-btn active" data-color="#000000" style="background-color: #000000;"></button>
+            <button class="color-btn" data-color="#FF0000" style="background-color: #FF0000;"></button>
+            <button class="color-btn" data-color="#FF8800" style="background-color: #FF8800;"></button>
+            <button class="color-btn" data-color="#FFFF00" style="background-color: #FFFF00;"></button>
+            <button class="color-btn" data-color="#00FF00" style="background-color: #00FF00;"></button>
+            <button class="color-btn" data-color="#0088FF" style="background-color: #0088FF;"></button>
+            <button class="color-btn" data-color="#8800FF" style="background-color: #8800FF;"></button>
+            <button class="color-btn" data-color="#FF00FF" style="background-color: #FF00FF;"></button>
+            <button class="color-btn eraser" data-color="#FFFFFF" title="Eraser">E</button>
+          </div>
+          <div class="brush-sizes">
+            <button class="size-btn" data-size="3">S</button>
+            <button class="size-btn active" data-size="8">M</button>
+            <button class="size-btn" data-size="16">L</button>
+          </div>
+          <button id="clear-canvas" class="btn btn-small">Clear</button>
+        </div>
+        <button id="submit-drawing" class="btn btn-primary">Submit Drawing</button>
+      </div>
+
+      <!-- Guess Phase -->
+      <div id="guess-phase" class="game-phase hidden">
+        <div class="prompt-display">
+          <p>What is this drawing?</p>
+        </div>
+        <div class="drawing-display">
+          <img id="drawing-to-guess" alt="Drawing to guess">
+        </div>
+        <div class="guess-input-container">
+          <input type="text" id="guess-input" maxlength="100" placeholder="Type your guess..." autocomplete="off">
+          <button id="submit-guess" class="btn btn-primary">Submit Guess</button>
+        </div>
+      </div>
+
+      <!-- Waiting Phase -->
+      <div id="waiting-phase" class="game-phase hidden">
+        <div class="waiting-message">
+          <h3>Submission received!</h3>
+          <p>Waiting for other players...</p>
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="results-screen" class="screen">
+      <h2>Results</h2>
+      <div class="chain-navigation">
+        <button id="prev-chain" class="btn btn-small">&lt; Prev</button>
+        <span id="chain-indicator">Chain 1/4</span>
+        <button id="next-chain" class="btn btn-small">Next &gt;</button>
+      </div>
+      <div id="chain-display" class="chain-display">
+        <!-- Chain items will be inserted here -->
+      </div>
+      <div id="results-host-controls" class="hidden">
+        <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+      </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="error-toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/lobby.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
