@@ -20,9 +20,15 @@ const GUESS_TIME = 45000; // 45 seconds
 // Track active timers per room
 const roomTimers = {};
 
+// Track sockets by player ID for direct emission
+const playerSockets = {};
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
+
+  // Store socket reference for direct emission
+  playerSockets[socket.id] = socket;
 
   // Create a new game room
   socket.on('create-room', (playerName, callback) => {
@@ -90,10 +96,10 @@ io.on('connection', (socket) => {
 
     const result = game.startGame(code);
     if (result.success) {
-      console.log(`Game started in room ${code}`);
+      console.log(`Game started in room ${code} with ${result.room.players.length} players`);
       callback({ success: true });
 
-      // Send each player their task
+      // Send each player their task immediately
       startRound(code);
     } else {
       callback({ success: false, error: result.error });
@@ -213,6 +219,9 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
 
+    // Clean up socket reference
+    delete playerSockets[socket.id];
+
     if (socket.roomCode) {
       const room = game.removePlayer(socket.roomCode, socket.id);
       if (room) {
@@ -240,15 +249,20 @@ function startRound(code) {
   const duration = room.roundType === 'draw' ? DRAW_TIME : GUESS_TIME;
   game.setRoundTimer(code, duration);
 
-  // Send each player their task
+  // Send each player their task using direct socket emission
   room.players.forEach(player => {
     if (player.connected) {
-      const task = game.getPlayerTask(code, player.id);
-      io.to(player.id).emit('round-start', {
-        ...task,
-        duration,
-        roomInfo: game.getPublicRoomInfo(code)
-      });
+      const playerSocket = playerSockets[player.id];
+      if (playerSocket) {
+        const task = game.getPlayerTask(code, player.id);
+        playerSocket.emit('round-start', {
+          ...task,
+          duration,
+          roomInfo: game.getPublicRoomInfo(code)
+        });
+      } else {
+        console.warn(`Socket not found for player ${player.id}`);
+      }
     }
   });
 
