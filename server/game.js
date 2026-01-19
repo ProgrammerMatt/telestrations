@@ -18,7 +18,7 @@ function generateRoomCode() {
 }
 
 // Create a new game room
-function createRoom(hostId, hostName) {
+function createRoom(hostId, hostName, options = {}) {
   const code = generateRoomCode();
   rooms[code] = {
     host: hostId,
@@ -34,9 +34,61 @@ function createRoom(hostId, hostName) {
     chains: {},
     submissions: {},
     roundStartTime: null,
-    roundDuration: 0
+    roundDuration: 0,
+    // New properties for public/private lobbies
+    isPublic: options.isPublic || false,
+    roomName: options.roomName || '',
+    // Chat messages
+    chatMessages: []
   };
   return code;
+}
+
+// Get list of public lobbies in lobby status
+function getPublicLobbies() {
+  const lobbies = [];
+  for (const [code, room] of Object.entries(rooms)) {
+    if (room.isPublic && room.status === 'lobby') {
+      lobbies.push({
+        code,
+        roomName: room.roomName,
+        playerCount: room.players.length,
+        maxPlayers: 8,
+        hostName: room.players.find(p => p.id === room.host)?.name || 'Unknown'
+      });
+    }
+  }
+  return lobbies;
+}
+
+// Add a chat message to the room
+function addChatMessage(code, playerId, playerName, message) {
+  const room = rooms[code];
+  if (!room) return null;
+
+  const chatMessage = {
+    id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+    playerId,
+    playerName,
+    message: message.substring(0, 500), // Limit message length
+    timestamp: Date.now()
+  };
+
+  room.chatMessages.push(chatMessage);
+
+  // Keep only last 100 messages
+  if (room.chatMessages.length > 100) {
+    room.chatMessages = room.chatMessages.slice(-100);
+  }
+
+  return chatMessage;
+}
+
+// Get chat messages for a room
+function getChatMessages(code) {
+  const room = rooms[code];
+  if (!room) return [];
+  return room.chatMessages;
 }
 
 // Join an existing room
@@ -289,7 +341,9 @@ function getPublicRoomInfo(code) {
     status: room.status,
     currentRound: room.currentRound,
     totalRounds: room.totalRounds,
-    roundType: room.roundType
+    roundType: room.roundType,
+    isPublic: room.isPublic,
+    roomName: room.roomName
   };
 }
 
@@ -306,5 +360,8 @@ module.exports = {
   nextRound,
   getResults,
   setRoundTimer,
-  getPublicRoomInfo
+  getPublicRoomInfo,
+  getPublicLobbies,
+  addChatMessage,
+  getChatMessages
 };

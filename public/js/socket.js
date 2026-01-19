@@ -40,6 +40,10 @@ const SocketClient = (function() {
     socket.on('returned-to-lobby', (roomInfo) => {
       trigger('returned-to-lobby', roomInfo);
     });
+
+    socket.on('chat-message', (data) => {
+      trigger('chat-message', data);
+    });
   }
 
   function on(event, handler) {
@@ -65,11 +69,52 @@ const SocketClient = (function() {
     }
   }
 
-  function createRoom(playerName) {
+  function createRoom(playerName, options = {}) {
     return new Promise((resolve, reject) => {
-      socket.emit('create-room', playerName, (response) => {
+      const data = {
+        playerName,
+        isPublic: options.isPublic || false,
+        roomName: options.roomName || ''
+      };
+      socket.emit('create-room', data, (response) => {
         if (response.success) {
           resolve(response);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
+    });
+  }
+
+  function getPublicLobbies() {
+    return new Promise((resolve, reject) => {
+      socket.emit('get-public-lobbies', (response) => {
+        if (response.success) {
+          resolve(response.lobbies);
+        } else {
+          reject(new Error(response.error || 'Failed to get lobbies'));
+        }
+      });
+    });
+  }
+
+  function sendChat(message) {
+    return new Promise((resolve, reject) => {
+      socket.emit('send-chat', message, (response) => {
+        if (response.success) {
+          resolve(response);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
+    });
+  }
+
+  function getChatHistory() {
+    return new Promise((resolve, reject) => {
+      socket.emit('get-chat-history', (response) => {
+        if (response.success) {
+          resolve(response.messages);
         } else {
           reject(new Error(response.error));
         }
@@ -164,6 +209,9 @@ const SocketClient = (function() {
     submitGuess,
     requestResults,
     returnToLobby,
-    getSocketId
+    getSocketId,
+    getPublicLobbies,
+    sendChat,
+    getChatHistory
   };
 })();

@@ -1,7 +1,7 @@
 {
-  "name": "telestrations-server",
+  "name": "sketchysecrets-server",
   "version": "1.0.0",
-  "description": "Telestrations multiplayer game server",
+  "description": "SketchySecrets multiplayer game server",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

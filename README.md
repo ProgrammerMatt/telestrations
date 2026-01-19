@@ -1,10 +1,10 @@
-# Telestrations
+# SketchySecrets
 
-A browser-based multiplayer Telestrations game supporting 3-8 players with real-time WebSocket communication.
+A browser-based multiplayer drawing and guessing game supporting 3-8 players with real-time WebSocket communication.
 
 ## How to Play
 
-Telestrations is a drawing and guessing game similar to "Telephone":
+SketchySecrets is a drawing and guessing game similar to "Telephone":
 
 1. Each player starts with a random word
 2. **Draw Phase (60 seconds)**: Draw your word
@@ -91,7 +91,7 @@ To play with friends on the same WiFi network:
 ## Project Structure
 
 ```
-telestrations/
+sketchysecrets/
 ├── server/
 │   ├── index.js          # Express + Socket.io server
 │   ├── game.js           # Game logic and state management

@@ -3,19 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Telestrations</title>
+  <title>SketchySecrets</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="app">
+  <div id="app-wrapper">
+    <div id="app">
     <!-- Home Screen -->
     <div id="home-screen" class="screen active">
-      <h1>Telestrations</h1>
+      <h1>SketchySecrets</h1>
       <p class="subtitle">Draw, Guess, Laugh!</p>
 
       <div class="home-buttons">
         <button id="create-game-btn" class="btn btn-primary">Create Game</button>
-        <button id="join-game-btn" class="btn btn-secondary">Join Game</button>
+        <button id="join-public-btn" class="btn btn-secondary">Join Public Game</button>
+        <button id="join-private-btn" class="btn btn-secondary">Join Private Game</button>
       </div>
     </div>
 
@@ -26,15 +28,26 @@
         <label for="host-name">Your Name</label>
         <input type="text" id="host-name" maxlength="20" placeholder="Enter your name" autocomplete="off">
       </div>
+      <div class="form-group">
+        <label>Lobby Visibility</label>
+        <div class="visibility-toggle">
+          <button type="button" id="visibility-public-btn" class="toggle-btn">Public</button>
+          <button type="button" id="visibility-private-btn" class="toggle-btn active">Private</button>
+        </div>
+      </div>
+      <div class="form-group" id="room-name-group">
+        <label for="room-name">Room Name <span class="optional">(optional)</span></label>
+        <input type="text" id="room-name" maxlength="30" placeholder="e.g., Fun Game Night" autocomplete="off">
+      </div>
       <div class="button-group">
         <button id="back-from-create" class="btn btn-secondary">Back</button>
         <button id="create-room-btn" class="btn btn-primary">Create Room</button>
       </div>
     </div>
 
-    <!-- Join Game Screen -->
-    <div id="join-screen" class="screen">
-      <h2>Join Game</h2>
+    <!-- Join Private Game Screen -->
+    <div id="join-private-screen" class="screen">
+      <h2>Join Private Game</h2>
       <div class="form-group">
         <label for="room-code">Room Code</label>
         <input type="text" id="room-code" maxlength="4" placeholder="XXXX" autocomplete="off" style="text-transform: uppercase;">
@@ -44,16 +57,40 @@
         <input type="text" id="player-name" maxlength="20" placeholder="Enter your name" autocomplete="off">
       </div>
       <div class="button-group">
-        <button id="back-from-join" class="btn btn-secondary">Back</button>
+        <button id="back-from-join-private" class="btn btn-secondary">Back</button>
         <button id="join-room-btn" class="btn btn-primary">Join Room</button>
+      </div>
+    </div>
+
+    <!-- Public Lobbies Screen -->
+    <div id="public-lobbies-screen" class="screen">
+      <h2>Public Games</h2>
+      <div class="form-group">
+        <label for="public-player-name">Your Name</label>
+        <input type="text" id="public-player-name" maxlength="20" placeholder="Enter your name" autocomplete="off">
+      </div>
+      <div class="lobbies-section">
+        <div class="lobbies-header">
+          <h3>Available Lobbies</h3>
+          <button id="refresh-lobbies-btn" class="btn btn-small">Refresh</button>
+        </div>
+        <div id="lobbies-list" class="lobbies-list">
+          <p class="no-lobbies">Loading lobbies...</p>
+        </div>
+      </div>
+      <div class="button-group">
+        <button id="back-from-public" class="btn btn-secondary">Back</button>
       </div>
     </div>
 
     <!-- Lobby Screen -->
     <div id="lobby-screen" class="screen">
       <h2>Lobby</h2>
-      <div class="room-code-display">
-        Room Code: <span id="display-room-code">----</span>
+      <div class="room-info-header">
+        <div class="room-code-display">
+          Room Code: <span id="display-room-code">----</span>
+        </div>
+        <span id="visibility-badge" class="visibility-badge private">PRIVATE</span>
       </div>
       <div class="players-section">
         <h3>Players (<span id="player-count">0</span>/8)</h3>
@@ -155,11 +192,29 @@
 
     <!-- Error Toast -->
     <div id="error-toast" class="toast hidden"></div>
+    </div>
+
+    <!-- Chat Sidebar (desktop) / Panel (mobile) -->
+    <div id="chat-panel" class="chat-panel hidden">
+      <div class="chat-header">
+        <span class="chat-title">Chat</span>
+        <span id="chat-unread-badge" class="chat-unread-badge hidden">0</span>
+        <button id="chat-toggle-btn" class="chat-toggle-btn">-</button>
+      </div>
+      <div class="chat-body">
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-container">
+          <input type="text" id="chat-input" maxlength="500" placeholder="Type a message..." autocomplete="off">
+          <button id="chat-send-btn" class="btn btn-small btn-primary">Send</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/socket.js"></script>
   <script src="js/canvas.js"></script>
+  <script src="js/chat.js"></script>
   <script src="js/lobby.js"></script>
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>

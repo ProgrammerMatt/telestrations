@@ -1,4 +1,4 @@
-// Word bank for Telestrations game
+// Word bank for SketchySecrets game
 // Categories: animals, food, objects, actions, places, people
 
 const words = [

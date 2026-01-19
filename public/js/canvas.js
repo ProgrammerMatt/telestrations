@@ -7,6 +7,9 @@ const DrawingCanvas = (function() {
   let brushSize = 8;
   let lastX = 0;
   let lastY = 0;
+  let currentScale = 1;
+  let cssWidth = 0;
+  let cssHeight = 0;
 
   function init() {
     canvas = document.getElementById('drawing-canvas');
@@ -14,8 +17,7 @@ const DrawingCanvas = (function() {
 
     ctx = canvas.getContext('2d');
 
-    // Set canvas size based on container
-    resizeCanvas();
+    // Don't resize here - canvas might be hidden. Will resize when shown.
     window.addEventListener('resize', resizeCanvas);
 
     // Mouse events
@@ -41,30 +43,31 @@ const DrawingCanvas = (function() {
   }
 
   function resizeCanvas() {
-    if (!canvas) return;
+    if (!canvas || !ctx) return;
 
     const container = canvas.parentElement;
     const rect = container.getBoundingClientRect();
 
-    // Store current drawing
-    const imageData = ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
-
-    // Set internal resolution (higher for quality)
-    const scale = window.devicePixelRatio || 1;
-    canvas.width = rect.width * scale;
-    canvas.height = rect.height * scale;
-
-    // Scale context to match
-    ctx.scale(scale, scale);
-
-    // Set white background
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Restore drawing if exists
-    if (imageData) {
-      ctx.putImageData(imageData, 0, 0);
+    // Skip if container has no dimensions (hidden)
+    if (rect.width === 0 || rect.height === 0) {
+      return;
     }
+
+    // Store CSS dimensions for coordinate calculations
+    cssWidth = rect.width;
+    cssHeight = rect.height;
+
+    // Set internal resolution (higher for quality on high-DPI screens)
+    currentScale = window.devicePixelRatio || 1;
+    canvas.width = rect.width * currentScale;
+    canvas.height = rect.height * currentScale;
+
+    // Scale context so we can draw in CSS pixel coordinates
+    ctx.scale(currentScale, currentScale);
+
+    // Set white background (use CSS dimensions since context is scaled)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
 
     // Set drawing properties
     ctx.lineCap = 'round';
@@ -111,6 +114,8 @@ const DrawingCanvas = (function() {
   }
 
   function startDrawing(e) {
+    if (!ctx || cssWidth === 0) return; // Canvas not ready
+
     isDrawing = true;
     const pos = getMousePos(e);
     lastX = pos.x;
@@ -124,7 +129,7 @@ const DrawingCanvas = (function() {
   }
 
   function draw(e) {
-    if (!isDrawing) return;
+    if (!isDrawing || !ctx) return;
 
     const pos = getMousePos(e);
 
@@ -145,6 +150,8 @@ const DrawingCanvas = (function() {
 
   function handleTouchStart(e) {
     e.preventDefault();
+    if (!ctx || cssWidth === 0) return; // Canvas not ready
+
     isDrawing = true;
     const pos = getTouchPos(e);
     lastX = pos.x;
@@ -159,7 +166,7 @@ const DrawingCanvas = (function() {
 
   function handleTouchMove(e) {
     e.preventDefault();
-    if (!isDrawing) return;
+    if (!isDrawing || !ctx) return;
 
     const pos = getTouchPos(e);
 
@@ -175,9 +182,10 @@ const DrawingCanvas = (function() {
   }
 
   function clear() {
-    if (!ctx) return;
+    if (!ctx || !canvas) return;
+    // Use CSS dimensions since context is scaled
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, cssWidth || canvas.width, cssHeight || canvas.height);
   }
 
   function toDataURL() {
@@ -186,7 +194,6 @@ const DrawingCanvas = (function() {
   }
 
   function reset() {
-    clear();
     // Reset tools to default
     currentColor = '#000000';
     brushSize = 8;
@@ -201,6 +208,8 @@ const DrawingCanvas = (function() {
     sizeButtons.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.size === '8');
     });
+
+    // Clear will be done after resize in resizeCanvas()
   }
 
   return {

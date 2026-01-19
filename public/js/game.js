@@ -71,7 +71,16 @@ const Game = (function() {
       showGuessPhase(data.prompt.content);
     }
 
+    // Show screen FIRST, then resize canvas (needs visible container for dimensions)
     App.showScreen('game-screen');
+
+    // Resize canvas after screen is visible so getBoundingClientRect works correctly
+    if (data.roundType === 'draw') {
+      // Use requestAnimationFrame to ensure layout is complete
+      requestAnimationFrame(() => {
+        DrawingCanvas.resizeCanvas();
+      });
+    }
   }
 
   function handleSubmissionUpdate(data) {
@@ -94,9 +103,8 @@ const Game = (function() {
     document.getElementById('word-to-draw').textContent = word;
     document.getElementById('draw-phase').classList.remove('hidden');
 
-    // Reset canvas
+    // Reset canvas (clears and resets tools, but don't resize yet - screen may not be visible)
     DrawingCanvas.reset();
-    DrawingCanvas.resizeCanvas();
 
     // Enable submit button
     document.getElementById('submit-drawing').disabled = false;

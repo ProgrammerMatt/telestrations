@@ -20,6 +20,20 @@ const Lobby = (function() {
       codeDisplay.textContent = roomInfo.code;
     }
 
+    // Update visibility badge
+    const visibilityBadge = document.getElementById('visibility-badge');
+    if (visibilityBadge) {
+      if (roomInfo.isPublic) {
+        visibilityBadge.textContent = 'PUBLIC';
+        visibilityBadge.classList.remove('private');
+        visibilityBadge.classList.add('public');
+      } else {
+        visibilityBadge.textContent = 'PRIVATE';
+        visibilityBadge.classList.remove('public');
+        visibilityBadge.classList.add('private');
+      }
+    }
+
     // Update player count
     const countDisplay = document.getElementById('player-count');
     if (countDisplay) {

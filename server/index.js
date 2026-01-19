@@ -31,19 +31,73 @@ io.on('connection', (socket) => {
   playerSockets[socket.id] = socket;
 
   // Create a new game room
-  socket.on('create-room', (playerName, callback) => {
-    const code = game.createRoom(socket.id, playerName);
+  socket.on('create-room', (data, callback) => {
+    // Support both old format (just playerName string) and new format (object)
+    let playerName, isPublic, roomName;
+    if (typeof data === 'string') {
+      playerName = data;
+      isPublic = false;
+      roomName = '';
+    } else {
+      playerName = data.playerName;
+      isPublic = data.isPublic || false;
+      roomName = data.roomName || '';
+    }
+
+    const code = game.createRoom(socket.id, playerName, { isPublic, roomName });
     socket.join(code);
     socket.roomCode = code;
     socket.playerName = playerName;
 
-    console.log(`Room ${code} created by ${playerName}`);
+    const visibility = isPublic ? 'public' : 'private';
+    console.log(`Room ${code} (${visibility}) created by ${playerName}`);
 
     callback({
       success: true,
       roomCode: code,
       room: game.getPublicRoomInfo(code)
     });
+  });
+
+  // Get list of public lobbies
+  socket.on('get-public-lobbies', (callback) => {
+    const lobbies = game.getPublicLobbies();
+    callback({ success: true, lobbies });
+  });
+
+  // Send chat message
+  socket.on('send-chat', (message, callback) => {
+    const code = socket.roomCode;
+    if (!code) {
+      callback({ success: false, error: 'Not in a room' });
+      return;
+    }
+
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      callback({ success: false, error: 'Invalid message' });
+      return;
+    }
+
+    const chatMessage = game.addChatMessage(code, socket.id, socket.playerName, message.trim());
+    if (chatMessage) {
+      // Broadcast to all players in the room
+      io.to(code).emit('chat-message', chatMessage);
+      callback({ success: true });
+    } else {
+      callback({ success: false, error: 'Failed to send message' });
+    }
+  });
+
+  // Get chat history
+  socket.on('get-chat-history', (callback) => {
+    const code = socket.roomCode;
+    if (!code) {
+      callback({ success: false, error: 'Not in a room' });
+      return;
+    }
+
+    const messages = game.getChatMessages(code);
+    callback({ success: true, messages });
   });
 
   // Join an existing room
@@ -249,20 +303,41 @@ function startRound(code) {
   const duration = room.roundType === 'draw' ? DRAW_TIME : GUESS_TIME;
   game.setRoundTimer(code, duration);
 
-  // Send each player their task using direct socket emission
-  room.players.forEach(player => {
-    if (player.connected) {
-      const playerSocket = playerSockets[player.id];
-      if (playerSocket) {
-        const task = game.getPlayerTask(code, player.id);
-        playerSocket.emit('round-start', {
-          ...task,
-          duration,
-          roomInfo: game.getPublicRoomInfo(code)
-        });
-      } else {
-        console.warn(`Socket not found for player ${player.id}`);
+  console.log(`Starting round ${room.currentRound + 1} for room ${code} (${room.roundType})`);
+
+  // Get all sockets currently in this room and send them their tasks
+  const socketsInRoom = io.sockets.adapter.rooms.get(code);
+  const sentTo = new Set();
+
+  if (socketsInRoom) {
+    socketsInRoom.forEach(socketId => {
+      const playerSocket = io.sockets.sockets.get(socketId);
+      if (playerSocket && playerSocket.roomCode === code && playerSocket.playerName) {
+        // Find player by name (more reliable than socket ID which can change)
+        const player = room.players.find(p => p.name === playerSocket.playerName);
+        if (player && player.connected) {
+          // Update player's socket ID to current socket (handles reconnects)
+          player.id = socketId;
+          playerSockets[socketId] = playerSocket;
+
+          const task = game.getPlayerTask(code, player.id);
+          const roundData = {
+            ...task,
+            duration,
+            roomInfo: game.getPublicRoomInfo(code)
+          };
+          playerSocket.emit('round-start', roundData);
+          sentTo.add(player.name);
+          console.log(`Sent round-start to ${player.name}`);
+        }
       }
+    });
+  }
+
+  // Log any players who didn't receive the event
+  room.players.forEach(player => {
+    if (player.connected && !sentTo.has(player.name)) {
+      console.warn(`Could not send round-start to ${player.name} - socket not in room`);
     }
   });
 
@@ -313,6 +388,6 @@ function clearRoomTimer(code) {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`Telestrations server running on http://localhost:${PORT}`);
+  console.log(`SketchySecrets server running on http://localhost:${PORT}`);
   console.log(`For local network play, find your IP with 'ipconfig' and share http://YOUR_IP:${PORT}`);
 });
