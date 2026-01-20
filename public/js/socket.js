@@ -51,6 +51,11 @@ const SocketClient = (function() {
     socket.on('chat-message', (data) => {
       trigger('chat-message', data);
     });
+
+    socket.on('online-count', (count) => {
+      const el = document.getElementById('online-count');
+      if (el) el.textContent = count;
+    });
   }
 
   function on(event, handler) {

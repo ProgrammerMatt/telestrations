@@ -140,6 +140,22 @@ h3 {
   text-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
+.online-counter {
+  color: rgba(255,255,255,0.9);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.online-counter #online-count {
+  color: var(--accent-color);
+  font-weight: 800;
+}
+
 /* Buttons */
 .btn {
   padding: 14px 28px;

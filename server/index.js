@@ -30,9 +30,21 @@ const roomTimers = {};
 // Track sockets by player ID for direct emission
 const playerSockets = {};
 
+// Track online count
+let onlineCount = 0;
+
+function broadcastOnlineCount() {
+  io.emit('online-count', onlineCount);
+}
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
+  onlineCount++;
+  broadcastOnlineCount();
+
+  // Send current count to newly connected client
+  socket.emit('online-count', onlineCount);
 
   // Store socket reference for direct emission
   playerSockets[socket.id] = socket;
@@ -279,6 +291,8 @@ io.on('connection', (socket) => {
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
+    onlineCount--;
+    broadcastOnlineCount();
 
     // Clean up socket reference
     delete playerSockets[socket.id];
