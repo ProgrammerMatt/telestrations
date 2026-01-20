@@ -6,7 +6,13 @@ const game = require('./game');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket', 'polling']
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -387,7 +393,6 @@ function clearRoomTimer(code) {
 }
 
 // Start server
-server.listen(PORT, () => {
-  console.log(`SketchySecrets server running on http://localhost:${PORT}`);
-  console.log(`For local network play, find your IP with 'ipconfig' and share http://YOUR_IP:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`SketchySecrets server running on port ${PORT}`);
 });
