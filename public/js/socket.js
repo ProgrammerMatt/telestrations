@@ -56,6 +56,22 @@ const SocketClient = (function() {
       const el = document.getElementById('online-count');
       if (el) el.textContent = count;
     });
+
+    socket.on('play-again-prompt', (data) => {
+      trigger('play-again-prompt', data);
+    });
+
+    socket.on('play-again-update', (data) => {
+      trigger('play-again-update', data);
+    });
+
+    socket.on('play-again-success', (data) => {
+      trigger('play-again-success', data);
+    });
+
+    socket.on('play-again-failed', (data) => {
+      trigger('play-again-failed', data);
+    });
   }
 
   function on(event, handler) {
@@ -206,6 +222,30 @@ const SocketClient = (function() {
     });
   }
 
+  function offerPlayAgain() {
+    return new Promise((resolve, reject) => {
+      socket.emit('offer-play-again', (response) => {
+        if (response.success) {
+          resolve(response);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
+    });
+  }
+
+  function respondPlayAgain(wantsToPlay) {
+    return new Promise((resolve, reject) => {
+      socket.emit('play-again-response', wantsToPlay, (response) => {
+        if (response.success) {
+          resolve(response);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
+    });
+  }
+
   function getSocketId() {
     return socket ? socket.id : null;
   }
@@ -221,6 +261,8 @@ const SocketClient = (function() {
     submitGuess,
     requestResults,
     returnToLobby,
+    offerPlayAgain,
+    respondPlayAgain,
     getSocketId,
     getPublicLobbies,
     sendChat,

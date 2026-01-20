@@ -5,12 +5,18 @@ const Game = (function() {
   let hasSubmitted = false;
   let currentChains = [];
   let currentChainIndex = 0;
+  let playAgainTimerInterval = null;
+  let hasRespondedPlayAgain = false;
 
   function init() {
     // Socket events
     SocketClient.on('round-start', handleRoundStart);
     SocketClient.on('submission-update', handleSubmissionUpdate);
     SocketClient.on('game-over', handleGameOver);
+    SocketClient.on('play-again-prompt', handlePlayAgainPrompt);
+    SocketClient.on('play-again-update', handlePlayAgainUpdate);
+    SocketClient.on('play-again-success', handlePlayAgainSuccess);
+    SocketClient.on('play-again-failed', handlePlayAgainFailed);
 
     // Submit buttons
     const submitDrawingBtn = document.getElementById('submit-drawing');
@@ -43,10 +49,26 @@ const Game = (function() {
       nextChainBtn.addEventListener('click', () => showChain(currentChainIndex + 1));
     }
 
-    // Play again button
-    const playAgainBtn = document.getElementById('play-again-btn');
-    if (playAgainBtn) {
-      playAgainBtn.addEventListener('click', returnToLobby);
+    // Offer play again button (host only)
+    const offerPlayAgainBtn = document.getElementById('offer-play-again-btn');
+    if (offerPlayAgainBtn) {
+      offerPlayAgainBtn.addEventListener('click', offerPlayAgain);
+    }
+
+    // Play again response buttons
+    const playAgainYesBtn = document.getElementById('play-again-yes');
+    const playAgainNoBtn = document.getElementById('play-again-no');
+    if (playAgainYesBtn) {
+      playAgainYesBtn.addEventListener('click', () => respondPlayAgain(true));
+    }
+    if (playAgainNoBtn) {
+      playAgainNoBtn.addEventListener('click', () => respondPlayAgain(false));
+    }
+
+    // Back to menu button
+    const menuBtn = document.getElementById('play-again-menu-btn');
+    if (menuBtn) {
+      menuBtn.addEventListener('click', goToMainMenu);
     }
   }
 
@@ -310,6 +332,111 @@ const Game = (function() {
     } catch (error) {
       App.showError('Failed to return to lobby: ' + error.message);
     }
+  }
+
+  // Play again functions
+  async function offerPlayAgain() {
+    const btn = document.getElementById('offer-play-again-btn');
+    if (btn) btn.disabled = true;
+
+    try {
+      await SocketClient.offerPlayAgain();
+    } catch (error) {
+      App.showError('Failed to offer play again: ' + error.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function handlePlayAgainPrompt(data) {
+    hasRespondedPlayAgain = false;
+
+    // Show modal
+    const modal = document.getElementById('play-again-modal');
+    modal.classList.remove('hidden');
+
+    // Reset modal state
+    document.getElementById('play-again-buttons').classList.remove('hidden');
+    document.getElementById('play-again-waiting').classList.add('hidden');
+    document.getElementById('play-again-result').classList.add('hidden');
+    document.getElementById('play-again-menu-btn').classList.add('hidden');
+    document.getElementById('play-again-yes-count').textContent = '0';
+    document.getElementById('play-again-yes').disabled = false;
+    document.getElementById('play-again-no').disabled = false;
+
+    // Start countdown
+    let countdown = Math.floor(data.timeout / 1000);
+    document.getElementById('play-again-countdown').textContent = countdown;
+
+    if (playAgainTimerInterval) clearInterval(playAgainTimerInterval);
+    playAgainTimerInterval = setInterval(() => {
+      countdown--;
+      document.getElementById('play-again-countdown').textContent = countdown;
+      if (countdown <= 0) {
+        clearInterval(playAgainTimerInterval);
+      }
+    }, 1000);
+  }
+
+  async function respondPlayAgain(wantsToPlay) {
+    if (hasRespondedPlayAgain) return;
+    hasRespondedPlayAgain = true;
+
+    // Disable buttons
+    document.getElementById('play-again-yes').disabled = true;
+    document.getElementById('play-again-no').disabled = true;
+
+    try {
+      await SocketClient.respondPlayAgain(wantsToPlay);
+
+      // Show waiting state
+      document.getElementById('play-again-buttons').classList.add('hidden');
+      document.getElementById('play-again-waiting').classList.remove('hidden');
+    } catch (error) {
+      App.showError('Failed to respond: ' + error.message);
+      hasRespondedPlayAgain = false;
+      document.getElementById('play-again-yes').disabled = false;
+      document.getElementById('play-again-no').disabled = false;
+    }
+  }
+
+  function handlePlayAgainUpdate(data) {
+    document.getElementById('play-again-yes-count').textContent = data.yesCount;
+  }
+
+  function handlePlayAgainSuccess(data) {
+    if (playAgainTimerInterval) clearInterval(playAgainTimerInterval);
+
+    // Hide modal
+    document.getElementById('play-again-modal').classList.add('hidden');
+
+    // Re-enable the offer button for next time
+    const btn = document.getElementById('offer-play-again-btn');
+    if (btn) btn.disabled = false;
+  }
+
+  function handlePlayAgainFailed(data) {
+    if (playAgainTimerInterval) clearInterval(playAgainTimerInterval);
+
+    // Show result
+    document.getElementById('play-again-buttons').classList.add('hidden');
+    document.getElementById('play-again-waiting').classList.add('hidden');
+    document.getElementById('play-again-timer').classList.add('hidden');
+    document.getElementById('play-again-result').classList.remove('hidden');
+    document.getElementById('play-again-result-message').textContent = data.message;
+    document.getElementById('play-again-menu-btn').classList.remove('hidden');
+  }
+
+  function goToMainMenu() {
+    // Hide modal
+    document.getElementById('play-again-modal').classList.add('hidden');
+    document.getElementById('play-again-timer').classList.remove('hidden');
+
+    // Re-enable button
+    const btn = document.getElementById('offer-play-again-btn');
+    if (btn) btn.disabled = false;
+
+    // Go to home screen
+    App.showScreen('home-screen');
   }
 
   return {

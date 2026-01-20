@@ -187,7 +187,33 @@
         <!-- Chain items will be inserted here -->
       </div>
       <div id="results-host-controls" class="hidden">
-        <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+        <button id="offer-play-again-btn" class="btn btn-primary">Offer to Play Again</button>
+      </div>
+    </div>
+
+    <!-- Play Again Modal -->
+    <div id="play-again-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="play-again-title">Play Again?</h3>
+        <p id="play-again-message">The host wants to start a new game!</p>
+        <div id="play-again-timer" class="play-again-timer">
+          <span id="play-again-countdown">15</span>s remaining
+        </div>
+        <div id="play-again-status" class="play-again-status">
+          <span id="play-again-yes-count">0</span> players want to continue
+        </div>
+        <div id="play-again-buttons" class="play-again-buttons">
+          <button id="play-again-yes" class="btn btn-primary">Yes, I'm in!</button>
+          <button id="play-again-no" class="btn btn-secondary">No thanks</button>
+        </div>
+        <div id="play-again-waiting" class="play-again-waiting hidden">
+          <p>Waiting for other players...</p>
+          <div class="spinner"></div>
+        </div>
+        <div id="play-again-result" class="play-again-result hidden">
+          <p id="play-again-result-message"></p>
+          <button id="play-again-menu-btn" class="btn btn-primary hidden">Back to Menu</button>
+        </div>
       </div>
     </div>
 

@@ -27,6 +27,11 @@ const GUESS_TIME = 45000; // 45 seconds
 // Track active timers per room
 const roomTimers = {};
 
+// Track play-again responses per room
+const playAgainResponses = {};
+const playAgainTimers = {};
+const PLAY_AGAIN_TIMEOUT = 15000; // 15 seconds
+
 // Track sockets by player ID for direct emission
 const playerSockets = {};
 
@@ -288,6 +293,76 @@ io.on('connection', (socket) => {
     callback({ success: true });
   });
 
+  // Host offers to play again
+  socket.on('offer-play-again', (callback) => {
+    const code = socket.roomCode;
+    if (!code) {
+      callback({ success: false, error: 'Not in a room' });
+      return;
+    }
+
+    const room = game.getRoom(code);
+    if (!room) {
+      callback({ success: false, error: 'Room not found' });
+      return;
+    }
+
+    if (room.host !== socket.id) {
+      callback({ success: false, error: 'Only the host can offer to play again' });
+      return;
+    }
+
+    // Initialize play-again tracking for this room
+    playAgainResponses[code] = {};
+
+    // Notify all players to show the play-again prompt
+    io.to(code).emit('play-again-prompt', { timeout: PLAY_AGAIN_TIMEOUT });
+
+    console.log(`Room ${code}: Host offered to play again`);
+    callback({ success: true });
+
+    // Set timeout to resolve play-again
+    playAgainTimers[code] = setTimeout(() => {
+      resolvePlayAgain(code);
+    }, PLAY_AGAIN_TIMEOUT);
+  });
+
+  // Player responds to play-again prompt
+  socket.on('play-again-response', (wantsToPlay, callback) => {
+    const code = socket.roomCode;
+    if (!code) {
+      callback({ success: false, error: 'Not in a room' });
+      return;
+    }
+
+    if (!playAgainResponses[code]) {
+      callback({ success: false, error: 'No play-again in progress' });
+      return;
+    }
+
+    playAgainResponses[code][socket.id] = wantsToPlay;
+
+    // Broadcast response count update
+    const responses = Object.values(playAgainResponses[code]);
+    const yesCount = responses.filter(r => r === true).length;
+    const totalResponses = responses.length;
+    io.to(code).emit('play-again-update', { yesCount, totalResponses });
+
+    console.log(`Room ${code}: ${socket.playerName} responded ${wantsToPlay ? 'yes' : 'no'} (${yesCount} yes so far)`);
+    callback({ success: true });
+
+    // Check if all connected players have responded
+    const room = game.getRoom(code);
+    if (room) {
+      const connectedPlayers = room.players.filter(p => p.connected);
+      if (totalResponses >= connectedPlayers.length) {
+        // All players responded, resolve immediately
+        clearTimeout(playAgainTimers[code]);
+        resolvePlayAgain(code);
+      }
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
@@ -404,6 +479,51 @@ function clearRoomTimer(code) {
   if (roomTimers[code]) {
     clearTimeout(roomTimers[code]);
     delete roomTimers[code];
+  }
+}
+
+// Helper: Resolve play-again voting
+function resolvePlayAgain(code) {
+  const room = game.getRoom(code);
+  if (!room) return;
+
+  const responses = playAgainResponses[code] || {};
+  const yesCount = Object.values(responses).filter(r => r === true).length;
+
+  // Clean up
+  delete playAgainResponses[code];
+  delete playAgainTimers[code];
+
+  if (yesCount >= 3) {
+    // Enough players want to play again
+    console.log(`Room ${code}: ${yesCount} players agreed to play again, starting new game`);
+
+    // Remove players who said no or didn't respond
+    const playersWhoSaidYes = Object.keys(responses).filter(id => responses[id] === true);
+    room.players = room.players.filter(p => playersWhoSaidYes.includes(p.id));
+
+    // Reset game state
+    room.status = 'lobby';
+    room.currentRound = 0;
+    room.totalRounds = 0;
+    room.roundType = null;
+    room.chains = {};
+    room.submissions = {};
+
+    // Start the game immediately
+    const result = game.startGame(code);
+    if (result.success) {
+      io.to(code).emit('play-again-success', { playerCount: yesCount });
+      // Small delay then start the round
+      setTimeout(() => startRound(code), 2000);
+    }
+  } else {
+    // Not enough players
+    console.log(`Room ${code}: Only ${yesCount} players agreed, not enough to play again`);
+    io.to(code).emit('play-again-failed', {
+      yesCount,
+      message: 'Not enough players agreed to play again.'
+    });
   }
 }
 
