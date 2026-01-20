@@ -72,6 +72,10 @@ const SocketClient = (function() {
     socket.on('play-again-failed', (data) => {
       trigger('play-again-failed', data);
     });
+
+    socket.on('player-rejoined', (roomInfo) => {
+      trigger('player-rejoined', roomInfo);
+    });
   }
 
   function on(event, handler) {
@@ -246,6 +250,18 @@ const SocketClient = (function() {
     });
   }
 
+  function rejoinRoom(roomCode, playerName) {
+    return new Promise((resolve, reject) => {
+      socket.emit('rejoin-room', { roomCode, playerName }, (response) => {
+        if (response.success) {
+          resolve(response);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
+    });
+  }
+
   function getSocketId() {
     return socket ? socket.id : null;
   }
@@ -256,6 +272,7 @@ const SocketClient = (function() {
     off,
     createRoom,
     joinRoom,
+    rejoinRoom,
     startGame,
     submitDrawing,
     submitGuess,

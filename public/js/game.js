@@ -435,13 +435,51 @@ const Game = (function() {
     const btn = document.getElementById('offer-play-again-btn');
     if (btn) btn.disabled = false;
 
+    // Clear saved session
+    App.clearSession();
+
     // Go to home screen
     App.showScreen('home-screen');
+  }
+
+  // Handle reconnection to an in-progress game
+  function handleReconnect(task, remainingTime, roomInfo) {
+    hasSubmitted = false;
+
+    // Update round info
+    document.getElementById('current-round').textContent = task.roundNumber;
+    document.getElementById('total-rounds').textContent = task.totalRounds;
+    document.getElementById('total-players').textContent = roomInfo.players.filter(p => p.connected).length;
+    document.getElementById('submitted-count').textContent = '0';
+
+    // Start timer with remaining time
+    const remainingSeconds = Math.max(1, Math.floor(remainingTime / 1000));
+    startTimer(remainingSeconds);
+
+    // Show appropriate phase
+    hideAllPhases();
+
+    if (task.roundType === 'draw') {
+      showDrawPhase(task.prompt.content);
+    } else {
+      showGuessPhase(task.prompt.content);
+    }
+
+    // Show game screen
+    App.showScreen('game-screen');
+
+    // Resize canvas if needed
+    if (task.roundType === 'draw') {
+      requestAnimationFrame(() => {
+        DrawingCanvas.resizeCanvas();
+      });
+    }
   }
 
   return {
     init,
     hideAllPhases,
-    stopTimer
+    stopTimer,
+    handleReconnect
   };
 })();

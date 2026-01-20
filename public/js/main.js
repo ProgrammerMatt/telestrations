@@ -16,8 +16,93 @@ const App = (function() {
     // Set up navigation
     setupNavigation();
 
-    // Show home screen
-    showScreen('home-screen');
+    // Listen for player-rejoined events
+    SocketClient.on('player-rejoined', (roomInfo) => {
+      Lobby.updateLobby(roomInfo);
+    });
+
+    // Check for reconnection opportunity
+    checkForReconnect();
+  }
+
+  function checkForReconnect() {
+    const savedSession = getSavedSession();
+    if (savedSession) {
+      // Show reconnect prompt
+      showReconnectPrompt(savedSession);
+    } else {
+      showScreen('home-screen');
+    }
+  }
+
+  function getSavedSession() {
+    try {
+      const data = localStorage.getItem('gameSession');
+      if (data) {
+        const session = JSON.parse(data);
+        // Check if session is less than 3 minutes old
+        if (Date.now() - session.timestamp < 180000) {
+          return session;
+        } else {
+          localStorage.removeItem('gameSession');
+        }
+      }
+    } catch (e) {
+      console.error('Error reading session:', e);
+    }
+    return null;
+  }
+
+  function saveSession(roomCode, playerName) {
+    try {
+      localStorage.setItem('gameSession', JSON.stringify({
+        roomCode,
+        playerName,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.error('Error saving session:', e);
+    }
+  }
+
+  function clearSession() {
+    localStorage.removeItem('gameSession');
+  }
+
+  function showReconnectPrompt(session) {
+    // Create simple confirm dialog
+    const shouldReconnect = confirm(
+      `You were in a game (Room: ${session.roomCode}) as "${session.playerName}". \n\nWould you like to rejoin?`
+    );
+
+    if (shouldReconnect) {
+      attemptReconnect(session);
+    } else {
+      clearSession();
+      showScreen('home-screen');
+    }
+  }
+
+  async function attemptReconnect(session) {
+    try {
+      const response = await SocketClient.rejoinRoom(session.roomCode, session.playerName);
+      Lobby.setRoom(response.room);
+
+      if (response.gameInProgress && response.task) {
+        // Game is in progress, jump to game screen
+        Game.handleReconnect(response.task, response.remainingTime, response.room);
+      } else if (response.room.status === 'results') {
+        // Game ended, go to results
+        showScreen('results-screen');
+      } else {
+        // Still in lobby
+        showScreen('lobby-screen');
+      }
+    } catch (error) {
+      showError('Could not rejoin: ' + error.message);
+      clearSession();
+      showScreen('home-screen');
+    }
   }
 
   function setupNavigation() {
@@ -113,6 +198,7 @@ const App = (function() {
         roomName: roomName
       });
       Lobby.setRoom(response.room);
+      saveSession(response.room.code, name);
       showScreen('lobby-screen');
     } catch (error) {
       showError(error.message);
@@ -141,6 +227,7 @@ const App = (function() {
     try {
       const response = await SocketClient.joinRoom(code, name);
       Lobby.setRoom(response.room);
+      saveSession(code, name);
       showScreen('lobby-screen');
     } catch (error) {
       showError(error.message);
@@ -200,6 +287,7 @@ const App = (function() {
     try {
       const response = await SocketClient.joinRoom(code, name);
       Lobby.setRoom(response.room);
+      saveSession(code, name);
       showScreen('lobby-screen');
     } catch (error) {
       showError(error.message);
@@ -261,6 +349,7 @@ const App = (function() {
 
   return {
     showScreen,
-    showError
+    showError,
+    clearSession
   };
 })();

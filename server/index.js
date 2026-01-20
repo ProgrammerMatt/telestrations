@@ -35,6 +35,11 @@ const PLAY_AGAIN_TIMEOUT = 15000; // 15 seconds
 // Track sockets by player ID for direct emission
 const playerSockets = {};
 
+// Track disconnect times for players
+const disconnectTimes = {};
+const DISCONNECT_TIMEOUT = 30000; // 30 seconds before auto-submitting placeholder
+const RECONNECT_WINDOW = 180000; // 3 minutes to reconnect
+
 // Track online count
 let onlineCount = 0;
 
@@ -373,20 +378,98 @@ io.on('connection', (socket) => {
     delete playerSockets[socket.id];
 
     if (socket.roomCode) {
-      const room = game.removePlayer(socket.roomCode, socket.id);
-      if (room) {
-        io.to(socket.roomCode).emit('player-left', game.getPublicRoomInfo(socket.roomCode));
+      const code = socket.roomCode;
+      const playerName = socket.playerName;
+      const room = game.removePlayer(code, socket.id);
 
-        // If game is in progress and all remaining players have submitted, advance
+      if (room) {
+        io.to(code).emit('player-left', game.getPublicRoomInfo(code));
+
+        // If game is in progress, track disconnect time and set auto-submit timer
         if (room.status === 'playing') {
+          const disconnectKey = `${code}:${playerName}`;
+          disconnectTimes[disconnectKey] = {
+            time: Date.now(),
+            roomCode: code,
+            playerName: playerName,
+            playerId: socket.id
+          };
+
+          // Set timer to auto-submit placeholder after 30 seconds
+          setTimeout(() => {
+            handleDisconnectTimeout(code, socket.id, playerName);
+          }, DISCONNECT_TIMEOUT);
+
+          // Check if all remaining connected players have submitted
           const connectedPlayers = room.players.filter(p => p.connected);
           const allSubmitted = connectedPlayers.every(p => room.submissions[p.id]);
           if (allSubmitted && connectedPlayers.length > 0) {
-            clearRoomTimer(socket.roomCode);
-            advanceRound(socket.roomCode);
+            clearRoomTimer(code);
+            advanceRound(code);
           }
         }
       }
+    }
+  });
+
+  // Handle reconnection attempt
+  socket.on('rejoin-room', (data, callback) => {
+    const { roomCode, playerName } = data;
+    const code = roomCode.toUpperCase();
+    const disconnectKey = `${code}:${playerName}`;
+
+    const room = game.getRoom(code);
+    if (!room) {
+      callback({ success: false, error: 'Room not found' });
+      return;
+    }
+
+    // Check if player was in this room
+    const existingPlayer = room.players.find(p => p.name === playerName);
+    if (!existingPlayer) {
+      callback({ success: false, error: 'Player not found in this room' });
+      return;
+    }
+
+    // Check if within reconnect window
+    const disconnectInfo = disconnectTimes[disconnectKey];
+    if (disconnectInfo && Date.now() - disconnectInfo.time > RECONNECT_WINDOW) {
+      callback({ success: false, error: 'Reconnect window expired' });
+      delete disconnectTimes[disconnectKey];
+      return;
+    }
+
+    // Reconnect the player
+    game.reconnectPlayer(code, existingPlayer.id, socket.id);
+    delete disconnectTimes[disconnectKey];
+
+    socket.join(code);
+    socket.roomCode = code;
+    socket.playerName = playerName;
+    playerSockets[socket.id] = socket;
+
+    console.log(`${playerName} reconnected to room ${code}`);
+
+    // Notify all players
+    io.to(code).emit('player-rejoined', game.getPublicRoomInfo(code));
+
+    // Send current game state to reconnected player
+    if (room.status === 'playing') {
+      const task = game.getPlayerTask(code, socket.id);
+      const remainingTime = room.roundDuration - (Date.now() - room.roundStartTime);
+      callback({
+        success: true,
+        room: game.getPublicRoomInfo(code),
+        gameInProgress: true,
+        task: task,
+        remainingTime: Math.max(0, remainingTime)
+      });
+    } else {
+      callback({
+        success: true,
+        room: game.getPublicRoomInfo(code),
+        gameInProgress: false
+      });
     }
   });
 });
@@ -438,10 +521,11 @@ function startRound(code) {
   });
 
   // Set timer to auto-advance when time runs out
+  // 3 second buffer gives clients time to auto-submit their work
   roomTimers[code] = setTimeout(() => {
     console.log(`Timer expired for room ${code}`);
     forceAdvanceRound(code);
-  }, duration + 1000); // Extra second buffer
+  }, duration + 3000);
 }
 
 // Helper: Advance to next round
@@ -458,20 +542,63 @@ function advanceRound(code) {
   }
 }
 
-// Helper: Force advance (for disconnected players or timeout)
+// Helper: Force advance (for timeout - only auto-submit for disconnected players)
 function forceAdvanceRound(code) {
   const room = game.getRoom(code);
   if (!room || room.status !== 'playing') return;
 
-  // Auto-submit empty responses for players who haven't submitted
+  // Only auto-submit for DISCONNECTED players who haven't submitted
+  // Connected players should have auto-submitted from their client
   room.players.forEach(player => {
-    if (player.connected && !room.submissions[player.id]) {
-      const emptyResponse = room.roundType === 'draw' ? '' : '(no guess)';
-      game.submitResponse(code, player.id, emptyResponse);
+    if (!room.submissions[player.id]) {
+      if (!player.connected) {
+        // Disconnected player - submit placeholder
+        const placeholder = room.roundType === 'draw' ? '' : '(player disconnected)';
+        game.submitResponse(code, player.id, placeholder);
+        console.log(`Auto-submitted placeholder for disconnected player ${player.name}`);
+      }
+      // For connected players who somehow didn't submit, give them benefit of doubt
+      // Their client should have auto-submitted
     }
   });
 
   advanceRound(code);
+}
+
+// Helper: Handle disconnect timeout (30 seconds)
+function handleDisconnectTimeout(code, playerId, playerName) {
+  const room = game.getRoom(code);
+  if (!room) return;
+
+  // Find player by name (ID may have changed)
+  const player = room.players.find(p => p.name === playerName);
+  if (!player) return;
+
+  // Only proceed if player is still disconnected
+  if (player.connected) {
+    console.log(`Player ${playerName} reconnected, skipping disconnect timeout`);
+    return;
+  }
+
+  // If game is still in progress and player hasn't submitted this round
+  if (room.status === 'playing' && !room.submissions[player.id]) {
+    const placeholder = room.roundType === 'draw' ? '' : '(player disconnected)';
+    const result = game.submitResponse(code, player.id, placeholder);
+    console.log(`Disconnect timeout: auto-submitted for ${playerName}`);
+
+    if (result.success) {
+      // Notify room
+      const submittedCount = Object.keys(room.submissions).length;
+      const totalPlayers = room.players.filter(p => p.connected).length;
+      io.to(code).emit('submission-update', { submitted: submittedCount, total: totalPlayers });
+
+      // Check if all have now submitted
+      if (result.allSubmitted) {
+        clearRoomTimer(code);
+        advanceRound(code);
+      }
+    }
+  }
 }
 
 // Helper: Clear room timer
