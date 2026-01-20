@@ -4,15 +4,22 @@ const SocketClient = (function() {
   const eventHandlers = {};
 
   function connect() {
-    socket = io();
+    console.log('Attempting to connect to server...');
+    socket = io({
+      transports: ['websocket', 'polling']
+    });
 
     socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('Connected to server with ID:', socket.id);
       trigger('connected');
     });
 
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error.message);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
       trigger('disconnected');
     });
 
