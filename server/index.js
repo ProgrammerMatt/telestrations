@@ -11,7 +11,8 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"]
   },
-  transports: ['websocket', 'polling']
+  transports: ['polling', 'websocket'],
+  allowEIO3: true
 });
 
 const PORT = process.env.PORT || 3000;
